@@ -15,8 +15,9 @@ Make sure you have the following installed:
 - Android SDK version 22 (compileSdkVersion in [`build.gradle`](build.gradle))
 - SDK build tools version 22.0.1 (buildToolsVersion in [`build.gradle`](build.gradle))
 - Android Support Repository 17 (for Android Support Library)
+- Android NDK (download & extraction instructions [here](http://developer.android.com/ndk/downloads/index.html))
  
-Point Gradle to your Android SDK - in the root of your clone of the github repo, create a file called `local.properties` with the following contents:
+Point Gradle to your Android SDK: either have `$ANDROID_SDK` and `$ANDROID_NDK` defined, or create a `local.properties` file in the root of your `react-native` checkout with the following contents:
 
     sdk.dir=absolute_path_to_android_sdk
     ndk.dir=absolute_path_to_android_ndk
@@ -24,14 +25,14 @@ Point Gradle to your Android SDK - in the root of your clone of the github repo,
 Example:
 
     sdk.dir=/Users/your_unix_name/android-sdk-macosx
-    ndk.dir=/Users/your_unix_name/android-ndk/android-ndk-r10c
+    ndk.dir=/Users/your_unix_name/android-ndk/android-ndk-r10e
 
 ## Run `npm install`
 
 This is needed to fetch the dependencies for the packager.
 
 ```bash
-cd react-native-android
+cd react-native
 npm install
 ```
 
@@ -40,7 +41,7 @@ npm install
 To build the framework code:
 
 ```bash
-cd react-native-android
+cd react-native
 ./gradlew :ReactAndroid:assembleDebug
 ```
 
@@ -55,7 +56,7 @@ To install a snapshot version of the framework code in your local Maven repo:
 To run the Sample app:
 
 ```bash
-cd react-native-android
+cd react-native
 ./gradlew :Examples:SampleApp:android:app:installDebug
 # Start the packager in a separate shell:
 # Make sure you ran npm install
@@ -77,7 +78,7 @@ You'll need to do one additional step until we release the React Native Gradle p
     mkdir -p /Applications/Android\ Studio.app/Contents/gradle/m2repository/com/facebook/react
     cp -r ~/.m2/repository/com/facebook/react/gradleplugin /Applications/Android\ Studio.app/Contents/gradle/m2repository/com/facebook/react/
 
-Now, open Android Studio, click _Import Non-Android Studio project_ and find your `react-native-android` repo.
+Now, open Android Studio, click _Import Non-Android Studio project_ and find your `react-native` repo.
   
 In the configurations dropdown, _app_ should be selected. Click _Run_.
 

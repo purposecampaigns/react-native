@@ -34,6 +34,8 @@ function getNameFromPath(filepath) {
     return 'Transforms';
   } else if (filepath === 'TabBarItemIOS') {
     return 'TabBarIOS.Item';
+  } else if (filepath === 'AnimatedImplementation') {
+    return 'Animated';
   }
   return filepath;
 }
@@ -43,7 +45,7 @@ function getPlatformFromPath(filepath) {
   while (ext = path.extname(filepath)) {
     filepath = path.basename(filepath, ext);
   }
-  
+
   if (endsWith(filepath, 'Android')) {
     return ANDROID_SUFFIX;
   } else if (endsWith(filepath, 'IOS')) {
@@ -107,7 +109,7 @@ function componentsToMarkdown(type, json, filepath, i, styles) {
   var componentName = getNameFromPath(filepath);
   var componentPlatform = getPlatformFromPath(filepath);
   var docFilePath = '../docs/' + componentName + '.md';
-  
+
   if (fs.existsSync(docFilePath)) {
     json.fullDescription = fs.readFileSync(docFilePath).toString();
   }
@@ -159,7 +161,7 @@ function renderAPI(type) {
     try {
       json = jsDocs(fs.readFileSync(filepath).toString());
     } catch(e) {
-      console.error('Cannot parse file', filepath);
+      console.error('Cannot parse file', filepath, e);
       json = {};
     }
     return componentsToMarkdown(type, json, filepath, n++);
@@ -191,6 +193,7 @@ var components = [
   '../Libraries/CustomComponents/ListView/ListView.js',
   '../Libraries/Components/MapView/MapView.js',
   '../Libraries/CustomComponents/Navigator/Navigator.js',
+  '../Libraries/Modal/Modal.js',
   '../Libraries/Components/Navigation/NavigatorIOS.ios.js',
   '../Libraries/Picker/PickerIOS.ios.js',
   '../Libraries/Components/ProgressBarAndroid/ProgressBarAndroid.android.js',
@@ -216,6 +219,7 @@ var components = [
 var apis = [
   '../Libraries/ActionSheetIOS/ActionSheetIOS.js',
   '../Libraries/Utilities/AlertIOS.js',
+  '../Libraries/Animated/src/AnimatedImplementation.js',
   '../Libraries/AppRegistry/AppRegistry.js',
   '../Libraries/AppStateIOS/AppStateIOS.ios.js',
   '../Libraries/Storage/AsyncStorage.ios.js',
@@ -256,7 +260,7 @@ var styleDocs = styles.slice(2).reduce(function(docs, filepath) {
     docgen.parse(
       fs.readFileSync(filepath),
       docgenHelpers.findExportedObject,
-      [docgen.handlers.propTypeHandler]
+      [docgen.handlers.propTypeHandler, docgen.handlers.propTypeCompositionHandler]
     );
 
   return docs;

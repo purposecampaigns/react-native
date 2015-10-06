@@ -291,7 +291,7 @@ public class MyCustomModule extends ReactContextBaseJavaModule {
 // Available as NativeModules.MyCustomModule.processString
   @ReactMethod
   public void processString(String input, Callback callback) {
-    callback.invoke(input.replace("Goodbye", "Hello");
+    callback.invoke(input.replace("Goodbye", "Hello"));
   }
 }
 `}
@@ -341,7 +341,7 @@ public class MyCustomViewManager extends SimpleViewManager<MyCustomView> {
 
   @Override
   protected MyCustomView createViewInstance(ThemedReactContext reactContext) {
-    return new MyCustomView(reactContext)
+    return new MyCustomView(reactContext);
   }
 
   @Override
