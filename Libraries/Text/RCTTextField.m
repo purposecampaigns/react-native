@@ -17,9 +17,10 @@
 @implementation RCTTextField
 {
   RCTEventDispatcher *_eventDispatcher;
-  NSMutableArray *_reactSubviews;
+  NSMutableArray<UIView *> *_reactSubviews;
   BOOL _jsRequestingFirstResponder;
   NSInteger _nativeEventCount;
+  BOOL _submitted;
 }
 
 - (instancetype)initWithEventDispatcher:(RCTEventDispatcher *)eventDispatcher
@@ -39,21 +40,21 @@
 RCT_NOT_IMPLEMENTED(- (instancetype)initWithFrame:(CGRect)frame)
 RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
 
-- (void)setSelectionRange:(NSDictionary *)selectionRange
+- (void)sendKeyValueForString:(NSString *)string
 {
-  NSInteger eventLag = _nativeEventCount - _mostRecentEventCount;
-  if (eventLag == 0) {
-    NSInteger selectionStart = [RCTConvert NSInteger:selectionRange[@"start"]];
-    NSInteger selectionEnd = [RCTConvert NSInteger:selectionRange[@"end"]];
-    UITextPosition *start = [self positionFromPosition:[self beginningOfDocument]
-                                                offset:selectionStart];
-    UITextPosition *end = [self positionFromPosition:[self beginningOfDocument]
-                                              offset:selectionEnd];
-    UITextRange *selection = [self textRangeFromPosition:start toPosition:end];
-    self.selectedTextRange = selection;
-  } else if (eventLag > RCTTextUpdateLagWarningThreshold) {
-    RCTLogWarn(@"Native TextInput(%@) is %zd events ahead of JS - try to make your JS faster.", self.text, eventLag);
-  }
+  [_eventDispatcher sendTextEventWithType:RCTTextEventTypeKeyPress
+                                 reactTag:self.reactTag
+                                     text:nil
+                                      key:string
+                               eventCount:_nativeEventCount];
+}
+
+// This method is overriden for `onKeyPress`. The manager
+// will not send a keyPress for text that was pasted.
+- (void)paste:(id)sender
+{
+  _textWasPasted = YES;
+  [super paste:sender];
 }
 
 - (void)setText:(NSString *)text
@@ -92,7 +93,7 @@ static void RCTUpdatePlaceholder(RCTTextField *self)
   RCTUpdatePlaceholder(self);
 }
 
-- (NSArray *)reactSubviews
+- (NSArray<UIView *> *)reactSubviews
 {
   // TODO: do we support subviews of textfield in React?
   // In any case, we should have a better approach than manually
@@ -151,6 +152,7 @@ static void RCTUpdatePlaceholder(RCTTextField *self)
   [_eventDispatcher sendTextEventWithType:RCTTextEventTypeChange
                                  reactTag:self.reactTag
                                      text:self.text
+                                      key:nil
                                eventCount:_nativeEventCount];
 }
 
@@ -159,13 +161,16 @@ static void RCTUpdatePlaceholder(RCTTextField *self)
   [_eventDispatcher sendTextEventWithType:RCTTextEventTypeEnd
                                  reactTag:self.reactTag
                                      text:self.text
+                                      key:nil
                                eventCount:_nativeEventCount];
 }
 - (void)textFieldSubmitEditing
 {
+  _submitted = YES;
   [_eventDispatcher sendTextEventWithType:RCTTextEventTypeSubmit
                                  reactTag:self.reactTag
                                      text:self.text
+                                      key:nil
                                eventCount:_nativeEventCount];
 }
 
@@ -179,7 +184,17 @@ static void RCTUpdatePlaceholder(RCTTextField *self)
   [_eventDispatcher sendTextEventWithType:RCTTextEventTypeFocus
                                  reactTag:self.reactTag
                                      text:self.text
+                                      key:nil
                                eventCount:_nativeEventCount];
+}
+
+- (BOOL)textFieldShouldEndEditing:(RCTTextField *)textField
+{
+  if (_submitted) {
+    _submitted = NO;
+    return _blurOnSubmit;
+  }
+  return YES;
 }
 
 - (BOOL)becomeFirstResponder
@@ -198,6 +213,7 @@ static void RCTUpdatePlaceholder(RCTTextField *self)
     [_eventDispatcher sendTextEventWithType:RCTTextEventTypeBlur
                                    reactTag:self.reactTag
                                        text:self.text
+                                        key:nil
                                  eventCount:_nativeEventCount];
   }
   return result;

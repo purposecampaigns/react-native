@@ -20,12 +20,17 @@ import android.text.InputType;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.TextWatcher;
+import android.text.style.AbsoluteSizeSpan;
+import android.text.style.BackgroundColorSpan;
+import android.text.style.ForegroundColorSpan;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 
 import com.facebook.infer.annotation.Assertions;
+import com.facebook.react.views.text.CustomStyleSpan;
+import com.facebook.react.views.text.ReactTagSpan;
 
 /**
  * A wrapper around the EditText that lets us better control what happens when an EditText gets
@@ -54,6 +59,7 @@ public class ReactEditText extends EditText {
   private int mNativeEventCount;
   private @Nullable ArrayList<TextWatcher> mListeners;
   private @Nullable TextWatcherDelegator mTextWatcherDelegator;
+  private int mStagedInputType;
 
   public ReactEditText(Context context) {
     super(context);
@@ -69,6 +75,7 @@ public class ReactEditText extends EditText {
     mIsJSSettingFocus = false;
     mListeners = null;
     mTextWatcherDelegator = null;
+    mStagedInputType = getInputType();
   }
 
   // After the text changes inside an EditText, TextView checks if a layout() has been requested.
@@ -103,6 +110,11 @@ public class ReactEditText extends EditText {
 
   @Override
   public boolean requestFocus(int direction, Rect previouslyFocusedRect) {
+    // Always return true if we are already focused. This is used by android in certain places,
+    // such as text selection.
+    if (isFocused()) {
+      return true;
+    }
     if (!mIsJSSettingFocus) {
       return false;
     }
@@ -132,6 +144,26 @@ public class ReactEditText extends EditText {
         super.removeTextChangedListener(getTextWatcherDelegator());
       }
     }
+  }
+
+  /*protected*/ int getStagedInputType() {
+    return mStagedInputType;
+  }
+
+  /*package*/ void setStagedInputType(int stagedInputType) {
+    mStagedInputType = stagedInputType;
+  }
+
+  /*package*/ void commitStagedInputType() {
+    if (getInputType() != mStagedInputType) {
+      setInputType(mStagedInputType);
+    }
+  }
+
+  @Override
+  public void setInputType(int type) {
+    super.setInputType(type);
+    mStagedInputType = type;
   }
 
   /* package */ void requestFocusFromJS() {
@@ -177,6 +209,15 @@ public class ReactEditText extends EditText {
   private void manageSpans(SpannableStringBuilder spannableStringBuilder) {
     Object[] spans = getText().getSpans(0, length(), Object.class);
     for (int spanIdx = 0; spanIdx < spans.length; spanIdx++) {
+      // Remove all styling spans we might have previously set
+      if (ForegroundColorSpan.class.isInstance(spans[spanIdx]) ||
+          BackgroundColorSpan.class.isInstance(spans[spanIdx]) ||
+          AbsoluteSizeSpan.class.isInstance(spans[spanIdx]) ||
+          CustomStyleSpan.class.isInstance(spans[spanIdx]) ||
+          ReactTagSpan.class.isInstance(spans[spanIdx])) {
+        getText().removeSpan(spans[spanIdx]);
+      }
+
       if ((getText().getSpanFlags(spans[spanIdx]) & Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) !=
           Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) {
         continue;

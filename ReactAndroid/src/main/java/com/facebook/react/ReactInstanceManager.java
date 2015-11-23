@@ -14,8 +14,11 @@ import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
+import android.app.Activity;
 import android.app.Application;
 import android.content.Context;
+import android.content.Intent;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.view.View;
 
@@ -40,6 +43,7 @@ import com.facebook.react.bridge.WritableNativeMap;
 import com.facebook.react.bridge.queue.CatalystQueueConfigurationSpec;
 import com.facebook.react.common.ReactConstants;
 import com.facebook.react.common.annotations.VisibleForTesting;
+import com.facebook.react.devsupport.DevServerHelper;
 import com.facebook.react.devsupport.DevSupportManager;
 import com.facebook.react.devsupport.ReactInstanceDevCommandsHandler;
 import com.facebook.react.modules.core.DefaultHardwareBackBtnHandler;
@@ -72,9 +76,11 @@ public class ReactInstanceManager {
   /* should only be accessed from main thread (UI thread) */
   private final List<ReactRootView> mAttachedRootViews = new ArrayList<>();
   private LifecycleState mLifecycleState;
+  private boolean mIsContextInitAsyncTaskRunning;
+  private @Nullable ReactContextInitParams mPendingReactContextInitParams;
 
   /* accessed from any thread */
-  private final @Nullable String mBundleAssetName; /* name of JS bundle file in assets folder */
+  private @Nullable String mJSBundleFile; /* path to JS bundle on file system */
   private final @Nullable String mJSMainModuleName; /* path to JS bundle root on packager server */
   private final List<ReactPackage> mPackages;
   private final DevSupportManager mDevSupportManager;
@@ -83,6 +89,8 @@ public class ReactInstanceManager {
   private @Nullable volatile ReactContext mCurrentReactContext;
   private final Context mApplicationContext;
   private @Nullable DefaultHardwareBackBtnHandler mDefaultBackButtonImpl;
+  private String mSourceUrl;
+  private @Nullable Activity mCurrentActivity;
 
   private final ReactInstanceDevCommandsHandler mDevInterface =
       new ReactInstanceDevCommandsHandler() {
@@ -105,15 +113,74 @@ public class ReactInstanceManager {
 
   private final DefaultHardwareBackBtnHandler mBackBtnHandler =
       new DefaultHardwareBackBtnHandler() {
-    @Override
-    public void invokeDefaultOnBackPressed() {
-      ReactInstanceManager.this.invokeDefaultOnBackPressed();
+        @Override
+        public void invokeDefaultOnBackPressed() {
+          ReactInstanceManager.this.invokeDefaultOnBackPressed();
+        }
+      };
+
+  private class ReactContextInitParams {
+    private final JavaScriptExecutor mJsExecutor;
+    private final JSBundleLoader mJsBundleLoader;
+
+    public ReactContextInitParams(
+        JavaScriptExecutor jsExecutor,
+        JSBundleLoader jsBundleLoader) {
+      mJsExecutor = Assertions.assertNotNull(jsExecutor);
+      mJsBundleLoader = Assertions.assertNotNull(jsBundleLoader);
     }
-  };
+
+    public JavaScriptExecutor getJsExecutor() {
+      return mJsExecutor;
+    }
+
+    public JSBundleLoader getJsBundleLoader() {
+      return mJsBundleLoader;
+    }
+  }
+
+  /*
+   * Task class responsible for (re)creating react context in the background. These tasks can only
+   * be executing one at time, see {@link #recreateReactContextInBackground()}.
+   */
+  private final class ReactContextInitAsyncTask extends
+      AsyncTask<ReactContextInitParams, Void, ReactApplicationContext> {
+
+    @Override
+    protected void onPreExecute() {
+      if (mCurrentReactContext != null) {
+        tearDownReactContext(mCurrentReactContext);
+        mCurrentReactContext = null;
+      }
+    }
+
+    @Override
+    protected ReactApplicationContext doInBackground(ReactContextInitParams... params) {
+      Assertions.assertCondition(params != null && params.length > 0 && params[0] != null);
+      return createReactContext(params[0].getJsExecutor(), params[0].getJsBundleLoader());
+    }
+
+    @Override
+    protected void onPostExecute(ReactApplicationContext reactContext) {
+      try {
+        setupReactContext(reactContext);
+      } finally {
+        mIsContextInitAsyncTaskRunning = false;
+      }
+
+      // Handle enqueued request to re-initialize react context.
+      if (mPendingReactContextInitParams != null) {
+        recreateReactContextInBackground(
+            mPendingReactContextInitParams.getJsExecutor(),
+            mPendingReactContextInitParams.getJsBundleLoader());
+        mPendingReactContextInitParams = null;
+      }
+    }
+  }
 
   private ReactInstanceManager(
       Context applicationContext,
-      @Nullable String bundleAssetName,
+      @Nullable String jsBundleFile,
       @Nullable String jsMainModuleName,
       List<ReactPackage> packages,
       boolean useDeveloperSupport,
@@ -122,7 +189,7 @@ public class ReactInstanceManager {
     initializeSoLoaderIfNecessary(applicationContext);
 
     mApplicationContext = applicationContext;
-    mBundleAssetName = bundleAssetName;
+    mJSBundleFile = jsBundleFile;
     mJSMainModuleName = jsMainModuleName;
     mPackages = packages;
     mUseDeveloperSupport = useDeveloperSupport;
@@ -161,10 +228,58 @@ public class ReactInstanceManager {
     SoLoader.init(applicationContext, /* native exopackage */ false);
   }
 
+  public void setJSBundleFile(String jsBundleFile) {
+    mJSBundleFile = jsBundleFile;
+  }
+
+  /**
+   * Trigger react context initialization asynchronously in a background async task. This enables
+   * applications to pre-load the application JS, and execute global code before
+   * {@link ReactRootView} is available and measured.
+   *
+   * Called from UI thread.
+   */
+  public void createReactContextInBackground() {
+    if (mUseDeveloperSupport && mJSMainModuleName != null) {
+      if (mDevSupportManager.hasUpToDateJSBundleInCache()) {
+        // If there is a up-to-date bundle downloaded from server, always use that
+        onJSBundleLoadedFromServer();
+      } else if (mJSBundleFile == null) {
+        mDevSupportManager.handleReloadJS();
+      } else {
+        mDevSupportManager.isPackagerRunning(
+            new DevServerHelper.PackagerStatusCallback() {
+              @Override
+              public void onPackagerStatusFetched(final boolean packagerIsRunning) {
+                UiThreadUtil.runOnUiThread(
+                    new Runnable() {
+                      @Override
+                      public void run() {
+                        if (packagerIsRunning) {
+                          mDevSupportManager.handleReloadJS();
+                        } else {
+                          recreateReactContextInBackgroundFromBundleFile();
+                        }
+                      }
+                    });
+              }
+            });
+      }
+      return;
+    }
+
+    recreateReactContextInBackgroundFromBundleFile();
+  }
+
+  private void recreateReactContextInBackgroundFromBundleFile() {
+    recreateReactContextInBackground(
+        new JSCJavaScriptExecutor(),
+        JSBundleLoader.createFileLoader(mApplicationContext, mJSBundleFile));
+  }
+
   /**
    * This method will give JS the opportunity to consume the back button event. If JS does not
-   * consume the event, mDefaultBackButtonImpl will be invoked at the end of the round trip
-   * to JS.
+   * consume the event, mDefaultBackButtonImpl will be invoked at the end of the round trip to JS.
    */
   public void onBackPressed() {
     UiThreadUtil.assertOnUiThread();
@@ -205,6 +320,7 @@ public class ReactInstanceManager {
       mDevSupportManager.setDevSupportEnabled(false);
     }
 
+    mCurrentActivity = null;
     if (mCurrentReactContext != null) {
       mCurrentReactContext.onPause();
     }
@@ -221,7 +337,7 @@ public class ReactInstanceManager {
    * @param defaultBackButtonImpl a {@link DefaultHardwareBackBtnHandler} from an Activity that owns
    * this instance of {@link ReactInstanceManager}.
    */
-  public void onResume(DefaultHardwareBackBtnHandler defaultBackButtonImpl) {
+  public void onResume(Activity activity, DefaultHardwareBackBtnHandler defaultBackButtonImpl) {
     UiThreadUtil.assertOnUiThread();
 
     mLifecycleState = LifecycleState.RESUMED;
@@ -231,8 +347,9 @@ public class ReactInstanceManager {
       mDevSupportManager.setDevSupportEnabled(true);
     }
 
+    mCurrentActivity = activity;
     if (mCurrentReactContext != null) {
-      mCurrentReactContext.onResume();
+      mCurrentReactContext.onResume(activity);
     }
   }
 
@@ -248,23 +365,44 @@ public class ReactInstanceManager {
     }
   }
 
+  public void onActivityResult(int requestCode, int resultCode, Intent data) {
+    if (mCurrentReactContext != null) {
+      mCurrentReactContext.onActivityResult(requestCode, resultCode, data);
+    }
+  }
+
   public void showDevOptionsDialog() {
     UiThreadUtil.assertOnUiThread();
     mDevSupportManager.showDevOptionsDialog();
   }
 
   /**
+   * Get the URL where the last bundle was loaded from.
+   */
+  public String getSourceUrl() {
+    return Assertions.assertNotNull(mSourceUrl);
+  }
+
+  /**
    * Attach given {@param rootView} to a catalyst instance manager and start JS application using
-   * JS module provided by {@link ReactRootView#getJSModuleName}. This view will then be tracked
-   * by this manager and in case of catalyst instance restart it will be re-attached.
+   * JS module provided by {@link ReactRootView#getJSModuleName}. If the react context is currently
+   * being (re)-created, or if react context has not been created yet, the JS application associated
+   * with the provided root view will be started asynchronously, i.e this method won't block.
+   * This view will then be tracked by this manager and in case of catalyst instance restart it will
+   * be re-attached.
    */
   /* package */ void attachMeasuredRootView(ReactRootView rootView) {
     UiThreadUtil.assertOnUiThread();
     mAttachedRootViews.add(rootView);
-    if (mCurrentReactContext == null) {
-      initializeReactContext();
-    } else {
-      attachMeasuredRootViewToInstance(rootView, mCurrentReactContext.getCatalystInstance());
+
+    // If react context is being created in the background, JS application will be started
+    // automatically when creation completes, as root view is part of the attached root view list.
+    if (!mIsContextInitAsyncTaskRunning) {
+      if (mCurrentReactContext == null) {
+        createReactContextInBackground();
+      } else {
+        attachMeasuredRootViewToInstance(rootView, mCurrentReactContext.getCatalystInstance());
+      }
     }
   }
 
@@ -300,53 +438,51 @@ public class ReactInstanceManager {
   }
 
   private void onReloadWithJSDebugger(ProxyJavaScriptExecutor proxyExecutor) {
-    recreateReactContext(
+    recreateReactContextInBackground(
         proxyExecutor,
         JSBundleLoader.createRemoteDebuggerBundleLoader(
             mDevSupportManager.getJSBundleURLForRemoteDebugging()));
   }
 
   private void onJSBundleLoadedFromServer() {
-    recreateReactContext(
+    recreateReactContextInBackground(
         new JSCJavaScriptExecutor(),
         JSBundleLoader.createCachedBundleFromNetworkLoader(
             mDevSupportManager.getSourceUrl(),
             mDevSupportManager.getDownloadedJSBundleFile()));
   }
 
-  private void initializeReactContext() {
-    if (mUseDeveloperSupport) {
-      if (mDevSupportManager.hasUpToDateJSBundleInCache()) {
-        // If there is a up-to-date bundle downloaded from server, always use that
-        onJSBundleLoadedFromServer();
-        return;
-      } else if (mBundleAssetName == null ||
-          !mDevSupportManager.hasBundleInAssets(mBundleAssetName)) {
-        // Bundle not available in assets, fetch from the server
-        mDevSupportManager.handleReloadJS();
-        return;
-      }
-    }
-    // Use JS file from assets
-    recreateReactContext(
-        new JSCJavaScriptExecutor(),
-        JSBundleLoader.createAssetLoader(
-            mApplicationContext.getAssets(),
-            mBundleAssetName));
-  }
-
-  private void recreateReactContext(
+  private void recreateReactContextInBackground(
       JavaScriptExecutor jsExecutor,
       JSBundleLoader jsBundleLoader) {
     UiThreadUtil.assertOnUiThread();
-    if (mCurrentReactContext != null) {
-      tearDownReactContext(mCurrentReactContext);
+
+    ReactContextInitParams initParams = new ReactContextInitParams(jsExecutor, jsBundleLoader);
+    if (!mIsContextInitAsyncTaskRunning) {
+      // No background task to create react context is currently running, create and execute one.
+      ReactContextInitAsyncTask initTask = new ReactContextInitAsyncTask();
+      initTask.execute(initParams);
+      mIsContextInitAsyncTaskRunning = true;
+    } else {
+      // Background task is currently running, queue up most recent init params to recreate context
+      // once task completes.
+      mPendingReactContextInitParams = initParams;
     }
-    mCurrentReactContext = createReactContext(jsExecutor, jsBundleLoader);
+  }
+
+  private void setupReactContext(ReactApplicationContext reactContext) {
+    UiThreadUtil.assertOnUiThread();
+    Assertions.assertCondition(mCurrentReactContext == null);
+    mCurrentReactContext = Assertions.assertNotNull(reactContext);
+    CatalystInstance catalystInstance =
+        Assertions.assertNotNull(reactContext.getCatalystInstance());
+
+    catalystInstance.initialize();
+    mDevSupportManager.onNewReactContextCreated(reactContext);
+    moveReactContextToCurrentLifecycleState(reactContext);
+
     for (ReactRootView rootView : mAttachedRootViews) {
-      attachMeasuredRootViewToInstance(
-          rootView,
-          mCurrentReactContext.getCatalystInstance());
+      attachMeasuredRootViewToInstance(rootView, catalystInstance);
     }
   }
 
@@ -399,6 +535,8 @@ public class ReactInstanceManager {
   private ReactApplicationContext createReactContext(
       JavaScriptExecutor jsExecutor,
       JSBundleLoader jsBundleLoader) {
+    FLog.i(ReactConstants.TAG, "Creating react context.");
+    mSourceUrl = jsBundleLoader.getSourceUrl();
     NativeModuleRegistry.Builder nativeRegistryBuilder = new NativeModuleRegistry.Builder();
     JavaScriptModulesConfig.Builder jsModulesBuilder = new JavaScriptModulesConfig.Builder();
 
@@ -430,10 +568,7 @@ public class ReactInstanceManager {
     }
 
     reactContext.initializeWithInstance(catalystInstance);
-    catalystInstance.initialize();
-    mDevSupportManager.onNewReactContextCreated(reactContext);
-
-    moveReactContextToCurrentLifecycleState(reactContext);
+    catalystInstance.runJSBundle();
 
     return reactContext;
   }
@@ -453,7 +588,7 @@ public class ReactInstanceManager {
 
   private void moveReactContextToCurrentLifecycleState(ReactApplicationContext reactContext) {
     if (mLifecycleState == LifecycleState.RESUMED) {
-      reactContext.onResume();
+      reactContext.onResume(mCurrentActivity);
     }
   }
 
@@ -464,7 +599,7 @@ public class ReactInstanceManager {
 
     private final List<ReactPackage> mPackages = new ArrayList<>();
 
-    private @Nullable String mBundleAssetName;
+    private @Nullable String mJSBundleFile;
     private @Nullable String mJSMainModuleName;
     private @Nullable NotThreadSafeBridgeIdleDebugListener mBridgeIdleDebugListener;
     private @Nullable Application mApplication;
@@ -475,11 +610,21 @@ public class ReactInstanceManager {
     }
 
     /**
-     * Name of the JS budle file to be loaded from application's raw assets.
+     * Name of the JS bundle file to be loaded from application's raw assets.
+     *
      * Example: {@code "index.android.js"}
      */
     public Builder setBundleAssetName(String bundleAssetName) {
-      mBundleAssetName = bundleAssetName;
+      return this.setJSBundleFile(bundleAssetName == null ? null : "assets://" + bundleAssetName);
+    }
+
+    /**
+     * Path to the JS bundle file to be loaded from the file system.
+     *
+     * Example: {@code "assets://index.android.js" or "/sdcard/main.jsbundle}
+     */
+    public Builder setJSBundleFile(String jsBundleFile) {
+      mJSBundleFile = jsBundleFile;
       return this;
     }
 
@@ -539,21 +684,23 @@ public class ReactInstanceManager {
      * Before calling {@code build}, the following must be called:
      * <ul>
      * <li> {@link #setApplication}
-     * <li> {@link #setBundleAssetName} or {@link #setJSMainModuleName}
+     * <li> {@link #setJSBundleFile} or {@link #setJSMainModuleName}
      * </ul>
      */
     public ReactInstanceManager build() {
       Assertions.assertCondition(
-          mUseDeveloperSupport || mBundleAssetName != null,
-          "JS Bundle has to be provided in app assets when dev support is disabled");
+          mUseDeveloperSupport || mJSBundleFile != null,
+          "JS Bundle File has to be provided when dev support is disabled");
+
       Assertions.assertCondition(
-          mBundleAssetName != null || mJSMainModuleName != null,
-          "Either BundleAssetName or MainModuleName needs to be provided");
+          mJSMainModuleName != null || mJSBundleFile != null,
+          "Either MainModuleName or JS Bundle File needs to be provided");
+
       return new ReactInstanceManager(
           Assertions.assertNotNull(
               mApplication,
               "Application property has not been set with this builder"),
-          mBundleAssetName,
+          mJSBundleFile,
           mJSMainModuleName,
           mPackages,
           mUseDeveloperSupport,

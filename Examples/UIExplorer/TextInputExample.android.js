@@ -91,6 +91,60 @@ class RewriteExample extends React.Component {
   }
 }
 
+class TokenizedTextExample extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {text: 'Hello #World'};
+  }
+  render() {
+
+    //define delimiter
+    let delimiter = /\s+/;
+
+    //split string
+    let _text = this.state.text;
+    let token, index, parts = [];
+    while (_text) {
+      delimiter.lastIndex = 0;
+      token = delimiter.exec(_text);
+      if (token === null) {
+        break;
+      }
+      index = token.index;
+      if (token[0].length === 0) {
+        index = 1;
+      }
+      parts.push(_text.substr(0, index));
+      parts.push(token[0]);
+      index = index + token[0].length;
+      _text = _text.slice(index);
+    }
+    parts.push(_text);
+
+    //highlight hashtags
+    parts = parts.map((text) => {
+      if (/^#/.test(text)) {
+        return <Text key={text} style={styles.hashtag}>{text}</Text>;
+      } else {
+        return text;
+      }
+    });
+
+    return (
+      <View>
+        <TextInput
+          multiline={true}
+          style={styles.multiline}
+          onChangeText={(text) => {
+            this.setState({text});
+          }}>
+          <Text>{parts}</Text>
+        </TextInput>
+      </View>
+    );
+  }
+}
+
 var styles = StyleSheet.create({
   multiline: {
     height: 60,
@@ -108,6 +162,10 @@ var styles = StyleSheet.create({
   },
   singleLineWithHeightTextInput: {
     height: 30,
+  },
+  hashtag: {
+    color: 'blue',
+    fontWeight: 'bold',
   },
 });
 
@@ -138,6 +196,7 @@ exports.examples = [
       var examples = autoCapitalizeTypes.map((type) => {
         return (
           <TextInput
+            key={type}
             autoCapitalize={type}
             placeholder={'autoCapitalize: ' + type}
             style={styles.singleLine}
@@ -177,6 +236,7 @@ exports.examples = [
       var examples = keyboardTypes.map((type) => {
         return (
           <TextInput
+            key={type}
             keyboardType={type}
             placeholder={'keyboardType: ' + type}
             style={styles.singleLine}
@@ -221,6 +281,13 @@ exports.examples = [
             style={styles.singleLine}
             underlineColorAndroid="blue"
           />
+          <TextInput
+            defaultValue="Same BackgroundColor as View "
+            style={[styles.singleLine, {backgroundColor: 'rgba(100, 100, 100, 0.3)'}]}>
+            <Text style={{backgroundColor: 'rgba(100, 100, 100, 0.3)'}}>
+              Darker backgroundColor
+            </Text>
+          </TextInput>
         </View>
       );
     }
@@ -311,6 +378,12 @@ exports.examples = [
           />
         </View>
       );
+    }
+  },
+  {
+    title: 'Attributed text',
+    render: function() {
+      return <TokenizedTextExample />;
     }
   },
 ];
