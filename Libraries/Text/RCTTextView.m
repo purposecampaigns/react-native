@@ -41,8 +41,9 @@
   NSInteger _nativeEventCount;
   RCTText *_richTextView;
   NSAttributedString *_pendingAttributedText;
-  NSMutableArray<UIView<RCTComponent> *> *_subviews;
+  NSMutableArray<UIView *> *_subviews;
   BOOL _blockTextShouldChange;
+  UITextRange *_previousSelectionRange;
 }
 
 - (instancetype)initWithEventDispatcher:(RCTEventDispatcher *)eventDispatcher
@@ -59,6 +60,8 @@
     _textView.scrollsToTop = NO;
     _textView.delegate = self;
 
+    _previousSelectionRange = _textView.selectedTextRange;
+
     _subviews = [NSMutableArray new];
     [self addSubview:_textView];
   }
@@ -68,12 +71,12 @@
 RCT_NOT_IMPLEMENTED(- (instancetype)initWithFrame:(CGRect)frame)
 RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
 
-- (NSArray<UIView<RCTComponent> *> *)reactSubviews
+- (NSArray<UIView *> *)reactSubviews
 {
   return _subviews;
 }
 
-- (void)insertReactSubview:(UIView<RCTComponent> *)subview atIndex:(NSInteger)index
+- (void)insertReactSubview:(UIView *)subview atIndex:(NSInteger)index
 {
   if ([subview isKindOfClass:[RCTText class]]) {
     if (_richTextView) {
@@ -87,7 +90,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
   }
 }
 
-- (void)removeReactSubview:(UIView<RCTComponent> *)subview
+- (void)removeReactSubview:(UIView *)subview
 {
   if (_richTextView == subview) {
     [_subviews removeObject:_richTextView];
@@ -284,20 +287,27 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
   }
 }
 
-- (void)setSelectionRange:(NSDictionary *)selectionRange
+- (void)textViewDidChangeSelection:(RCTUITextView *)textView
 {
-  NSInteger eventLag = _nativeEventCount - _mostRecentEventCount;
-  if (eventLag == 0) {
-    NSInteger selectionStart = [RCTConvert NSInteger:selectionRange[@"start"]];
-    NSInteger selectionEnd = [RCTConvert NSInteger:selectionRange[@"end"]];
-    UITextPosition *start = [_textView positionFromPosition:[_textView beginningOfDocument]
-                                                     offset:selectionStart];
-    UITextPosition *end = [_textView positionFromPosition:[_textView beginningOfDocument]
-                                                   offset:selectionEnd];
-    UITextRange *selection = [_textView textRangeFromPosition:start toPosition:end];
-    _textView.selectedTextRange = selection;
-  } else if (eventLag > RCTTextUpdateLagWarningThreshold) {
-    RCTLogWarn(@"Native TextInput(%@) is %zd events ahead of JS - try to make your JS faster.", self.text, eventLag);
+  if (_onSelectionChange &&
+      textView.selectedTextRange != _previousSelectionRange &&
+      ![textView.selectedTextRange isEqual:_previousSelectionRange]) {
+
+    _previousSelectionRange = textView.selectedTextRange;
+
+    UITextRange *selection = textView.selectedTextRange;
+    NSInteger start = [textView offsetFromPosition:[textView beginningOfDocument] toPosition:selection.start];
+    NSInteger end = [textView offsetFromPosition:[textView beginningOfDocument] toPosition:selection.end];
+    _onSelectionChange(@{
+      @"selection": @{
+        @"start": @(start),
+        @"end": @(end),
+      },
+    });
+  }
+
+  if (textView.editable && [textView isFirstResponder]) {
+    [textView scrollRangeToVisible:textView.selectedRange];
   }
 }
 
