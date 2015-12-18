@@ -55,7 +55,7 @@
   "dependencies": {
     "absolute-path": "^0.0.0",
     "art": "^0.10.0",
-    "babel": "^6.3.17",
+    "babel": "^6.3.13",
     "babel-core": "^6.3.21",
     "bser": "^1.0.2",
     "chalk": "^1.1.1",
