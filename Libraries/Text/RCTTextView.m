@@ -352,7 +352,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
   }
 }
 
-(void)setSelectionRange:(NSDictionary *)selectionRange
+- (void)setSelectionRange:(NSDictionary *)selectionRange
 {
   NSInteger eventLag = _nativeEventCount - _mostRecentEventCount;
   if (eventLag == 0) {
