@@ -62,7 +62,7 @@ public class ReactWebViewManager extends SimpleViewManager<WebView> {
   private static final String REACT_CLASS = "RCTWebView";
 
   private static final String HTML_ENCODING = "UTF-8";
-  private static final String HTML_MIME_TYPE = "text/html";
+  private static final String HTML_MIME_TYPE = "text/html; charset=utf-8";
 
   public static final int COMMAND_GO_BACK = 1;
   public static final int COMMAND_GO_FORWARD = 2;
@@ -76,7 +76,8 @@ public class ReactWebViewManager extends SimpleViewManager<WebView> {
 
   static {
     if (ReactBuildConfig.DEBUG && Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-      WebView.setWebContentsDebuggingEnabled(true);
+      // TODO(T9455950): re-enable debugging
+      // WebView.setWebContentsDebuggingEnabled(true);
     }
   }
 
@@ -253,6 +254,11 @@ public class ReactWebViewManager extends SimpleViewManager<WebView> {
   @ReactProp(name = "javaScriptEnabledAndroid")
   public void setJavaScriptEnabled(WebView view, boolean enabled) {
     view.getSettings().setJavaScriptEnabled(enabled);
+  }
+
+  @ReactProp(name = "domStorageEnabledAndroid")
+  public void setDomStorageEnabled(WebView view, boolean enabled) {
+    view.getSettings().setDomStorageEnabled(enabled);
   }
 
   @ReactProp(name = "userAgent")

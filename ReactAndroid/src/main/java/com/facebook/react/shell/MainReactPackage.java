@@ -27,9 +27,12 @@ import com.facebook.react.modules.storage.AsyncStorageModule;
 import com.facebook.react.modules.toast.ToastModule;
 import com.facebook.react.modules.websocket.WebSocketModule;
 import com.facebook.react.uimanager.ViewManager;
+import com.facebook.react.views.art.ARTRenderableViewManager;
+import com.facebook.react.views.art.ARTSurfaceViewManager;
 import com.facebook.react.views.drawer.ReactDrawerLayoutManager;
 import com.facebook.react.views.image.ReactImageManager;
 import com.facebook.react.views.progressbar.ReactProgressBarViewManager;
+import com.facebook.react.views.recyclerview.RecyclerViewBackedScrollViewManager;
 import com.facebook.react.views.scroll.ReactHorizontalScrollViewManager;
 import com.facebook.react.views.scroll.ReactScrollViewManager;
 import com.facebook.react.views.switchview.ReactSwitchManager;
@@ -73,11 +76,16 @@ public class MainReactPackage implements ReactPackage {
   @Override
   public List<ViewManager> createViewManagers(ReactApplicationContext reactContext) {
     return Arrays.<ViewManager>asList(
+      ARTRenderableViewManager.createARTGroupViewManager(),
+      ARTRenderableViewManager.createARTShapeViewManager(),
+      ARTRenderableViewManager.createARTTextViewManager(),
+      new ARTSurfaceViewManager(),
       new ReactDrawerLayoutManager(),
       new ReactHorizontalScrollViewManager(),
       new ReactImageManager(),
       new ReactProgressBarViewManager(),
       new ReactRawTextManager(),
+      new RecyclerViewBackedScrollViewManager(),
       new ReactScrollViewManager(),
       new ReactSwitchManager(),
       new ReactTextInputManager(),

@@ -9,6 +9,7 @@
 #include <folly/json.h>
 #include <folly/String.h>
 #include <jni/fbjni/Exceptions.h>
+#include <sys/time.h>
 #include "Value.h"
 #include "jni/OnLoad.h"
 
@@ -30,9 +31,16 @@ using fbsystrace::FbSystraceSection;
 // Add native performance markers support
 #include <react/JSCPerfLogging.h>
 
+#ifdef WITH_FB_MEMORY_PROFILING
+#include <react/JSCMemory.h>
+#endif
+
 #ifdef WITH_FB_JSC_TUNING
 #include <jsc_config_android.h>
 #endif
+
+static const int64_t NANOSECONDS_IN_SECOND = 1000000000LL;
+static const int64_t NANOSECONDS_IN_MILLISECOND = 1000000LL;
 
 using namespace facebook::jni;
 
@@ -54,31 +62,13 @@ static JSValueRef nativeLoggingHook(
     size_t argumentCount,
     const JSValueRef arguments[],
     JSValueRef *exception);
-
-static JSValueRef evaluateScriptWithJSC(
-    JSGlobalContextRef ctx,
-    JSStringRef script,
-    JSStringRef sourceURL) {
-  JSValueRef exn;
-  auto result = JSEvaluateScript(ctx, script, nullptr, sourceURL, 0, &exn);
-  if (result == nullptr) {
-    JSValueProtect(ctx, exn);
-    std::string exceptionText = Value(ctx, exn).toString().str();
-    FBLOGE("Got JS Exception: %s", exceptionText.c_str());
-    auto line = Value(ctx, JSObjectGetProperty(ctx,
-      JSValueToObject(ctx, exn, nullptr),
-      JSStringCreateWithUTF8CString("line"), nullptr
-    ));
-    std::ostringstream lineInfo;
-    if (line != nullptr && line.isNumber()) {
-      lineInfo << " (line " << line.asInteger() << " in the generated bundle)";
-    } else {
-      lineInfo << " (no line info)";
-    }
-    throwNewJavaException("com/facebook/react/bridge/JSExecutionException", (exceptionText + lineInfo.str()).c_str());
-  }
-  return result;
-}
+static JSValueRef nativePerformanceNow(
+    JSContextRef ctx,
+    JSObjectRef function,
+    JSObjectRef thisObject,
+    size_t argumentCount,
+    const JSValueRef arguments[],
+    JSValueRef *exception);
 
 static std::string executeJSCallWithJSC(
     JSGlobalContextRef ctx,
@@ -95,8 +85,7 @@ static std::string executeJSCallWithJSC(
   auto js = folly::to<folly::fbstring>(
       "__fbBatchedBridge.", methodName, ".apply(null, ",
       folly::toJson(jsonArgs), ")");
-  auto result = evaluateScriptWithJSC(ctx, String(js.c_str()), nullptr);
-  JSValueProtect(ctx, result);
+  auto result = evaluateScript(ctx, String(js.c_str()), nullptr);
   return Value(ctx, result).toJSONString();
 }
 
@@ -110,6 +99,7 @@ JSCExecutor::JSCExecutor(FlushImmediateCallback cb) :
   s_globalContextRefToJSCExecutor[m_context] = this;
   installGlobalFunction(m_context, "nativeFlushQueueImmediate", nativeFlushQueueImmediate);
   installGlobalFunction(m_context, "nativeLoggingHook", nativeLoggingHook);
+  installGlobalFunction(m_context, "nativePerformanceNow", nativePerformanceNow);
 
   #ifdef WITH_FB_JSC_TUNING
   configureJSCForAndroid();
@@ -119,6 +109,10 @@ JSCExecutor::JSCExecutor(FlushImmediateCallback cb) :
   addNativeTracingHooks(m_context);
   addNativeProfilingHooks(m_context);
   addNativePerfLoggingHooks(m_context);
+  #endif
+
+  #ifdef WITH_FB_MEMORY_PROFILING
+  addNativeMemoryHooks(m_context);
   #endif
 }
 
@@ -147,7 +141,7 @@ void JSCExecutor::executeApplicationScript(
   FbSystraceSection s(TRACE_TAG_REACT_CXX_BRIDGE, "JSCExecutor::executeApplicationScript",
     "sourceURL", sourceURL);
   #endif
-  evaluateScriptWithJSC(m_context, jsScript, jsSourceURL);
+  evaluateScript(m_context, jsScript, jsSourceURL);
 }
 
 std::string JSCExecutor::flush() {
@@ -252,7 +246,6 @@ static JSValueRef nativeFlushQueueImmediate(
     return JSValueMakeUndefined(ctx);
   }
 
-  JSValueProtect(ctx, arguments[0]);
   std::string resStr = Value(ctx, arguments[0]).toJSONString();
 
   executor->flushQueueImmediate(resStr);
@@ -281,6 +274,19 @@ static JSValueRef nativeLoggingHook(
     FBLOG_PRI(logLevel, "ReactNativeJS", "%s", message.str().c_str());
   }
   return JSValueMakeUndefined(ctx);
+}
+
+static JSValueRef nativePerformanceNow(
+    JSContextRef ctx,
+    JSObjectRef function,
+    JSObjectRef thisObject,
+    size_t argumentCount,
+    const JSValueRef arguments[], JSValueRef *exception) {
+  // This is equivalent to android.os.SystemClock.elapsedRealtime() in native
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC_RAW, &now);
+  int64_t nano = now.tv_sec * NANOSECONDS_IN_SECOND + now.tv_nsec;
+  return JSValueMakeNumber(ctx, (nano / (double)NANOSECONDS_IN_MILLISECOND));
 }
 
 } }

@@ -37,6 +37,9 @@ public class NetInfoModule extends ReactContextBaseJavaModule
 
   private static final String CONNECTION_TYPE_NONE = "NONE";
   private static final String CONNECTION_TYPE_UNKNOWN = "UNKNOWN";
+  private static final String MISSING_PERMISSION_MESSAGE =
+      "To use NetInfo on Android, add the following to your AndroidManifest.xml:\n" +
+      "<uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\" />";
 
   private static final String MISSING_PERMISSION_MESSAGE =
       "To use NetInfo on Android, add the following to your AndroidManifest.xml:\n" +
@@ -45,6 +48,7 @@ public class NetInfoModule extends ReactContextBaseJavaModule
   private final ConnectivityManager mConnectivityManager;
   private final ConnectivityManagerCompat mConnectivityManagerCompat;
   private final ConnectivityBroadcastReceiver mConnectivityBroadcastReceiver;
+  private boolean mNoNetworkPermission = false;
 
   private boolean mNoNetworkPermission = false;
 

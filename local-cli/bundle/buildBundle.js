@@ -25,12 +25,14 @@ function buildBundle(args, config, output = outputBundle) {
       projectRoots: config.getProjectRoots(),
       assetRoots: config.getAssetRoots(),
       blacklistRE: config.getBlacklistRE(),
+      getTransformOptionsModulePath: config.getTransformOptionsModulePath,
       transformModulePath: args.transformer,
       verbose: args.verbose,
     };
 
     const requestOpts = {
       entryFile: args['entry-file'],
+      sourceMapUrl: args['sourcemap-output'],
       dev: args.dev,
       minify: !args.dev,
       platform: args.platform,

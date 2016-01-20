@@ -64,6 +64,13 @@ var featured = [
     author: 'Lrn Labs, Inc',
   },
   {
+    name: 'Movie Trailers by MovieLaLa',
+    icon: 'https://lh3.googleusercontent.com/16aug4m_6tvJB7QZden9w1SOMqpZgNp7rHqDhltZNvofw1a4V_ojGGXUMPGiK0dDCqzL=w300',
+    linkAppStore: 'https://itunes.apple.com/us/app/movie-trailers-by-movielala/id1001416601?mt=8',
+    linkPlayStore: 'https://play.google.com/store/apps/details?id=com.movielala.trailers',
+    author: 'MovieLaLa'
+  },
+  {
     name: 'Myntra',
     icon: 'http://a5.mzstatic.com/us/r30/Purple6/v4/9c/78/df/9c78dfa6-0061-1af2-5026-3e1d5a073c94/icon350x350.png',
     link: 'https://itunes.apple.com/in/app/myntra-fashion-shopping-app/id907394059',
@@ -117,6 +124,12 @@ var featured = [
 
 var apps = [
   {
+    name: 'Accio',
+    icon: 'http://a3.mzstatic.com/us/r30/Purple3/v4/03/a1/5b/03a15b9f-04d7-a70a-620a-9c9850a859aa/icon175x175.png',
+    link: 'https://itunes.apple.com/us/app/accio-on-demand-delivery/id1047060673?mt=8',
+    author: 'Accio Delivery Inc.',
+  },
+  {
     name: 'Beetroot',
     icon: 'http://is1.mzstatic.com/image/pf/us/r30/Purple5/v4/66/fd/dd/66fddd70-f848-4fc5-43ee-4d52197ccab8/pr_source.png',
     link: 'https://itunes.apple.com/us/app/beetroot/id1016159001?ls=1&mt=8',
@@ -136,6 +149,12 @@ var apps = [
     author: 'CANDDi LTD.',
   },
   {
+    name: 'CBS Sports Franchise Football',
+    icon: 'http://a2.mzstatic.com/us/r30/Purple69/v4/7b/0c/a0/7b0ca007-885a-7cfc-9fa2-2ec4394c2ecc/icon175x175.png',
+    link: 'https://play.google.com/store/apps/details?id=com.cbssports.fantasy.franchisefootball2015',
+    author: 'CBS Sports',
+  },  
+  {
     name: 'Company name search',
     icon: 'http://a4.mzstatic.com/us/r30/Purple69/v4/fd/47/53/fd47537c-5861-e208-d1d1-1e26b5e45a36/icon350x350.jpeg',
     link: 'https://itunes.apple.com/us/app/company-name-search/id1043824076',
@@ -151,10 +170,33 @@ var apps = [
     author: 'Rishabh Mehan',
   },
   {
+    name: 'DockMan',
+    icon: 'http://a1.mzstatic.com/us/r30/Purple49/v4/91/b5/75/91b57552-d9bc-d8bc-10a1-617de920aaa6/icon175x175.png',
+    linkAppStore: 'https://itunes.apple.com/app/dockman/id1061469696',
+    linkPlayStore: 'https://play.google.com/store/apps/details?id=com.s21g.DockMan',
+    blogs: [
+      'http://www.s21g.com/DockMan.html',
+    ],
+    author: 'Genki Takiuchi (s21g Inc.)',
+  },
+  {
     name: 'DropBot',
     icon: 'http://a2.mzstatic.com/us/r30/Purple69/v4/fb/df/73/fbdf73e0-22d2-c936-3115-1defa195acba/icon175x175.png',
     link:  'https://itunes.apple.com/us/app/dropbot-phone-replacement/id1000855694?mt=8',
     author: 'Peach Labs',
+  },
+  {
+    name: 'Due',
+    icon: 'http://a1.mzstatic.com/us/r30/Purple69/v4/a2/41/5d/a2415d5f-407a-c565-ffb4-4f27f23d8ac2/icon175x175.png',
+    link: 'https://itunes.apple.com/us/app/due-countdown-reminders-for/id1050909468?mt=8',
+    author: 'Dotan Nahum',
+  },
+  {
+    name: 'Eat or Not',
+    icon: 'http://a3.mzstatic.com/us/r30/Purple5/v4/51/be/34/51be3462-b015-ebf2-11c5-69165b37fadc/icon175x175.jpeg',
+    linkAppStore: 'https://itunes.apple.com/us/app/eat-or-not/id1054565697?mt=8',
+    linkPlayStore: 'https://play.google.com/store/apps/details?id=com.eon',
+    author: 'Sharath Prabhal',
   },
   {
     name: 'Fan of it',
@@ -218,6 +260,12 @@ var apps = [
     author: 'Daniel Levitt',
   },
   {
+    name: 'Koza Gujarati Dictionary',
+    icon: 'http://a1.mzstatic.com/us/r30/Purple69/v4/77/95/83/77958377-05ae-4754-684a-3c9dbb67b517/icon175x175.jpeg',
+    link: 'https://itunes.apple.com/in/app/koza-english-to-gujarati-dictionary/id982752928?mt=8',
+    author: 'KozaApps',
+  },
+  {
     name: 'Leanpub',
     icon: 'http://a2.mzstatic.com/us/r30/Purple6/v4/9f/4a/6f/9f4a6f8c-8951-ed89-4083-74ace23df9ef/icon350x350.jpeg',
     link: 'https://itunes.apple.com/us/app/leanpub/id913517110?ls=1&mt=8',
@@ -228,6 +276,12 @@ var apps = [
     icon: 'http://a2.mzstatic.com/us/r30/Purple3/v4/b5/ca/78/b5ca78ca-392d-6874-48bf-762293482d42/icon350x350.jpeg',
     link: 'https://itunes.apple.com/us/app/loaddocs/id1041596066',
     author: 'LoadDocs',
+  },
+  {
+    name: 'Lugg – Your On-Demand Mover',
+    icon: 'http://lh3.googleusercontent.com/EV9z7kRRME2KPMBRNHnje7bBNEl_Why2CFq-MfKzBC88uSFJTYr1HO3-nPt-JuVJwKFb=w300-rw',
+    link: 'https://play.google.com/store/apps/details?id=com.lugg',
+    author: 'Lugg',
   },
   {
     name: 'Lumpen Radio',
@@ -303,6 +357,12 @@ var apps = [
     author: 'Levi Cabral',
   },
   {
+    name: 'Pimmr',
+    icon: 'http://a2.mzstatic.com/eu/r30/Purple69/v4/99/da/0e/99da0ee6-bc87-e1a6-1d95-7027c78f50e1/icon175x175.jpeg',
+    link: 'https://itunes.apple.com/nl/app/pimmr/id1023343303?mt=8',
+    author: 'Pimmr'
+  },
+  {
     name: 'Posyt - Tinder for ideas',
     icon: 'http://a3.mzstatic.com/us/r30/Purple6/v4/a5/b3/86/a5b38618-a5e9-6089-7425-7fa51ecd5d30/icon175x175.jpeg',
     link: 'https://itunes.apple.com/us/app/posyt-anonymously-meet-right/id1037842845?mt=8',
@@ -345,6 +405,12 @@ var apps = [
     author: 'Rota',
   },
   {
+    name: 'RWpodPlayer - audio player for RWpod podcast',
+    icon: 'http://a1.mzstatic.com/us/r30/Purple69/v4/a8/c0/b1/a8c0b130-e44b-742d-6458-0c89fcc15b6b/icon175x175.png',
+    link: 'https://itunes.apple.com/us/app/rwpodplayer/id1053885042?mt=8',
+    author: 'Alexey Vasiliev aka leopard',
+  },
+  {
     name: 'SG Toto 4d',
     icon: 'http://a4.mzstatic.com/us/r30/Purple7/v4/d2/bc/46/d2bc4696-84d6-9681-a49f-7f660d6b04a7/icon175x175.jpeg',
     link: 'https://itunes.apple.com/us/app/sg-toto-4d/id1006371481?mt=8',
@@ -363,10 +429,23 @@ var apps = [
     author: 'PrazAs Learning Inc.',
   },
   {
+    name: 'Thai Tone',
+    icon: 'http://a5.mzstatic.com/us/r30/Purple2/v4/b1/e6/2b/b1e62b3d-6747-0d0b-2a21-b6ba316a7890/icon175x175.png',
+    link: 'https://itunes.apple.com/us/app/thai-tone/id1064086189?mt=8',
+    author: 'Alexey Ledak',
+  },
+  {
     name: 'Tong Xing Wang',
     icon: 'http://a3.mzstatic.com/us/r30/Purple1/v4/7d/52/a7/7d52a71f-9532-82a5-b92f-87076624fdb2/icon175x175.jpeg',
     link: 'https://itunes.apple.com/cn/app/tong-xing-wang/id914254459?mt=8',
     author: 'Ho Yin Tsun Eugene',
+  },
+  {
+    name: 'WEARVR',
+    icon: 'http://a2.mzstatic.com/eu/r30/Purple69/v4/4f/5a/28/4f5a2876-9530-ef83-e399-c5ef5b2dab80/icon175x175.png',
+    linkAppStore: 'https://itunes.apple.com/gb/app/wearvr/id1066288171?mt=8',
+    linkPlayStore: 'https://play.google.com/store/apps/details?id=com.wearvr.app',
+    author: 'WEARVR LLC',
   },
   {
     name: 'WOOP',
@@ -404,6 +483,13 @@ var apps = [
     link: 'https://itunes.apple.com/us/app/yazboz-batak-esli-batak-okey/id1048620855?ls=1&mt=8',
     author: 'Melih Mucuk',
   },
+  {
+    name:'天才段子手',
+    icon:'http://pp.myapp.com/ma_icon/0/icon_12236104_1451810987/96',
+    linkAppStore: 'https://itunes.apple.com/us/app/tian-cai-duan-zi-shou-shen/id992312701?l=zh&ls=1&mt=8',
+    linkPlayStore: 'https://play.google.com/store/apps/details?id=com.geniusJokeWriter.app',
+    author:'Ran Zhao&Ji Zhao'
+  }
 ];
 
 var AppList = React.createClass({

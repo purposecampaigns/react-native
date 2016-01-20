@@ -10,20 +10,17 @@
 #import "RCTModuleData.h"
 
 #import "RCTBridge.h"
+#import "RCTBridge+Private.h"
 #import "RCTModuleMethod.h"
 #import "RCTLog.h"
 #import "RCTUtils.h"
-
-@interface RCTBridge (Private)
-
-- (void)registerModuleForFrameUpdates:(RCTModuleData *)moduleData;
-
-@end
 
 @implementation RCTModuleData
 {
   NSString *_queueName;
   __weak RCTBridge *_bridge;
+  NSLock *_instanceLock;
+  BOOL _setupComplete;
 }
 
 @synthesize methods = _methods;
@@ -36,22 +33,80 @@
   if ((self = [super init])) {
     _moduleClass = moduleClass;
     _bridge = bridge;
+
+    _implementsBatchDidComplete = [_moduleClass instancesRespondToSelector:@selector(batchDidComplete)];
+    _implementsPartialBatchDidFlush = [_moduleClass instancesRespondToSelector:@selector(partialBatchDidFlush)];
+
+    _instanceLock = [NSLock new];
   }
   return self;
 }
 
 - (instancetype)initWithModuleInstance:(id<RCTBridgeModule>)instance
+                                bridge:(RCTBridge *)bridge
 {
-  if ((self = [super init])) {
+  if ((self = [self initWithModuleClass:[instance class] bridge:bridge])) {
     _instance = instance;
-    _moduleClass = [instance class];
-
-    [self cacheImplementedSelectors];
   }
   return self;
 }
 
 RCT_NOT_IMPLEMENTED(- (instancetype)init);
+
+#pragma mark - private setup methods
+
+- (void)setBridgeForInstance
+{
+  RCTAssert(_instance, @"setBridgeForInstance called before %@ initialized", self.name);
+  if ([_instance respondsToSelector:@selector(bridge)] && !_instance.bridge) {
+    @try {
+      [(id)_instance setValue:_bridge forKey:@"bridge"];
+    }
+    @catch (NSException *exception) {
+      RCTLogError(@"%@ has no setter or ivar for its bridge, which is not "
+                  "permitted. You must either @synthesize the bridge property, "
+                  "or provide your own setter method.", self.name);
+    }
+  }
+}
+
+- (void)setUpMethodQueue
+{
+  if (!_methodQueue) {
+    RCTAssert(_instance, @"setUpMethodQueue called before %@ initialized", self.name);
+    BOOL implementsMethodQueue = [_instance respondsToSelector:@selector(methodQueue)];
+    if (implementsMethodQueue) {
+      _methodQueue = _instance.methodQueue;
+    }
+    if (!_methodQueue) {
+
+      // Create new queue (store queueName, as it isn't retained by dispatch_queue)
+      _queueName = [NSString stringWithFormat:@"com.facebook.React.%@Queue", self.name];
+      _methodQueue = dispatch_queue_create(_queueName.UTF8String, DISPATCH_QUEUE_SERIAL);
+
+      // assign it to the module
+      if (implementsMethodQueue) {
+        @try {
+          [(id)_instance setValue:_methodQueue forKey:@"methodQueue"];
+        }
+        @catch (NSException *exception) {
+          RCTLogError(@"%@ is returning nil for it's methodQueue, which is not "
+                      "permitted. You must either return a pre-initialized "
+                      "queue, or @synthesize the methodQueue to let the bridge "
+                      "create a queue for you.", self.name);
+        }
+      }
+    }
+
+    // Needs to be sent after bridge has been set for all module instances.
+    // Makes sense to put it here, since the same rules apply for methodQueue.
+    [[NSNotificationCenter defaultCenter]
+     postNotificationName:RCTDidInitializeModuleNotification
+     object:_bridge userInfo:@{@"module": _instance}];
+  }
+}
+
+#pragma mark - public getters
 
 - (BOOL)hasInstance
 {
@@ -60,41 +115,21 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init);
 
 - (id<RCTBridgeModule>)instance
 {
-  if (!_instance) {
-    _instance = [_moduleClass new];
-
+  [_instanceLock lock];
+  if (!_setupComplete) {
+    if (!_instance) {
+      _instance = [_moduleClass new];
+    }
     // Bridge must be set before methodQueue is set up, as methodQueue
     // initialization requires it (View Managers get their queue by calling
     // self.bridge.uiManager.methodQueue)
-    [self setBridgeForInstance:_bridge];
-
-    // Initialize queue
-    [self methodQueue];
-
-    [self cacheImplementedSelectors];
+    [self setBridgeForInstance];
+    [self setUpMethodQueue];
+    [_bridge registerModuleForFrameUpdates:_instance withModuleData:self];
+    _setupComplete = YES;
   }
+  [_instanceLock unlock];
   return _instance;
-}
-
-- (void)cacheImplementedSelectors
-{
-  _implementsBatchDidComplete = [_instance respondsToSelector:@selector(batchDidComplete)];
-  _implementsPartialBatchDidFlush = [_instance respondsToSelector:@selector(partialBatchDidFlush)];
-}
-
-- (void)setBridgeForInstance:(RCTBridge *)bridge
-{
-  if ([_instance respondsToSelector:@selector(bridge)]) {
-    @try {
-      [(id)_instance setValue:bridge forKey:@"bridge"];
-    }
-    @catch (NSException *exception) {
-      RCTLogError(@"%@ has no setter or ivar for its bridge, which is not "
-                  "permitted. You must either @synthesize the bridge property, "
-                  "or provide your own setter method.", self.name);
-    }
-  }
-  [bridge registerModuleForFrameUpdates:self];
 }
 
 - (NSString *)name
@@ -107,7 +142,8 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init);
   if (!_methods) {
     NSMutableArray<id<RCTBridgeMethod>> *moduleMethods = [NSMutableArray new];
 
-    if ([_instance respondsToSelector:@selector(methodsToExport)]) {
+    if ([_moduleClass instancesRespondToSelector:@selector(methodsToExport)]) {
+      [self instance];
       [moduleMethods addObjectsFromArray:[_instance methodsToExport]];
     }
 
@@ -122,9 +158,9 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init);
         NSArray<NSString *> *entries =
           ((NSArray<NSString *> *(*)(id, SEL))imp)(_moduleClass, selector);
         id<RCTBridgeMethod> moduleMethod =
-          [[RCTModuleMethod alloc] initWithObjCMethodName:entries[1]
-                                             JSMethodName:entries[0]
-                                              moduleClass:_moduleClass];
+          [[RCTModuleMethod alloc] initWithMethodSignature:entries[1]
+                                              JSMethodName:entries[0]
+                                               moduleClass:_moduleClass];
 
         [moduleMethods addObject:moduleMethod];
       }
@@ -141,7 +177,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init);
 {
   __block NSDictionary<NSString *, id> *constants;
   if (RCTClassOverridesInstanceMethod(_moduleClass, @selector(constantsToExport))) {
-    [self instance]; // Initialize instance
+    [self instance];
     RCTExecuteOnMainThread(^{
       constants = [_instance constantsToExport];
     }, YES);
@@ -179,31 +215,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init);
 
 - (dispatch_queue_t)methodQueue
 {
-  if (!_methodQueue) {
-    BOOL implementsMethodQueue = [self.instance respondsToSelector:@selector(methodQueue)];
-    if (implementsMethodQueue) {
-      _methodQueue = _instance.methodQueue;
-    }
-    if (!_methodQueue) {
-
-      // Create new queue (store queueName, as it isn't retained by dispatch_queue)
-      _queueName = [NSString stringWithFormat:@"com.facebook.React.%@Queue", self.name];
-      _methodQueue = dispatch_queue_create(_queueName.UTF8String, DISPATCH_QUEUE_SERIAL);
-
-      // assign it to the module
-      if (implementsMethodQueue) {
-        @try {
-          [(id)_instance setValue:_methodQueue forKey:@"methodQueue"];
-        }
-        @catch (NSException *exception) {
-          RCTLogError(@"%@ is returning nil for it's methodQueue, which is not "
-                      "permitted. You must either return a pre-initialized "
-                      "queue, or @synthesize the methodQueue to let the bridge "
-                      "create a queue for you.", self.name);
-        }
-      }
-    }
-  }
+  [self instance];
   return _methodQueue;
 }
 
