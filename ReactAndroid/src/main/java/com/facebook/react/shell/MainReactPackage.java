@@ -17,6 +17,7 @@ import com.facebook.react.ReactPackage;
 import com.facebook.react.bridge.JavaScriptModule;
 import com.facebook.react.bridge.NativeModule;
 import com.facebook.react.bridge.ReactApplicationContext;
+import com.facebook.react.modules.camera.CameraRollManager;
 import com.facebook.react.modules.dialog.DialogModule;
 import com.facebook.react.modules.fresco.FrescoModule;
 import com.facebook.react.modules.intent.IntentModule;
@@ -31,6 +32,8 @@ import com.facebook.react.views.art.ARTRenderableViewManager;
 import com.facebook.react.views.art.ARTSurfaceViewManager;
 import com.facebook.react.views.drawer.ReactDrawerLayoutManager;
 import com.facebook.react.views.image.ReactImageManager;
+import com.facebook.react.views.picker.ReactDialogPickerManager;
+import com.facebook.react.views.picker.ReactDropdownPickerManager;
 import com.facebook.react.views.progressbar.ReactProgressBarViewManager;
 import com.facebook.react.views.recyclerview.RecyclerViewBackedScrollViewManager;
 import com.facebook.react.views.scroll.ReactHorizontalScrollViewManager;
@@ -57,6 +60,7 @@ public class MainReactPackage implements ReactPackage {
   public List<NativeModule> createNativeModules(ReactApplicationContext reactContext) {
     return Arrays.<NativeModule>asList(
       new AsyncStorageModule(reactContext),
+      new CameraRollManager(reactContext),
       new ClipboardModule(reactContext),
       new DialogModule(reactContext),
       new FrescoModule(reactContext),
@@ -80,7 +84,9 @@ public class MainReactPackage implements ReactPackage {
       ARTRenderableViewManager.createARTShapeViewManager(),
       ARTRenderableViewManager.createARTTextViewManager(),
       new ARTSurfaceViewManager(),
+      new ReactDialogPickerManager(),
       new ReactDrawerLayoutManager(),
+      new ReactDropdownPickerManager(),
       new ReactHorizontalScrollViewManager(),
       new ReactImageManager(),
       new ReactProgressBarViewManager(),
