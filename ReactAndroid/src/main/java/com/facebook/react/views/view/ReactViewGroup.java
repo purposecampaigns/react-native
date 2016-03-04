@@ -23,7 +23,7 @@ import android.view.ViewGroup;
 
 import com.facebook.infer.annotation.Assertions;
 import com.facebook.react.common.annotations.VisibleForTesting;
-import com.facebook.react.touch.CatalystInterceptingViewGroup;
+import com.facebook.react.touch.ReactInterceptingViewGroup;
 import com.facebook.react.touch.OnInterceptTouchEventListener;
 import com.facebook.react.uimanager.MeasureSpecAssertions;
 import com.facebook.react.uimanager.PointerEvents;
@@ -34,7 +34,7 @@ import com.facebook.react.uimanager.ReactPointerEventsView;
  * initializes most of the storage needed for them.
  */
 public class ReactViewGroup extends ViewGroup implements
-    CatalystInterceptingViewGroup, ReactClippingViewGroup, ReactPointerEventsView {
+    ReactInterceptingViewGroup, ReactClippingViewGroup, ReactPointerEventsView {
 
   private static final int ARRAY_CAPACITY_INCREMENT = 12;
   private static final int DEFAULT_BACKGROUND_COLOR = Color.TRANSPARENT;
@@ -207,6 +207,10 @@ public class ReactViewGroup extends ViewGroup implements
     getOrCreateReactViewBackground().setRadius(borderRadius);
   }
 
+  public void setBorderRadius(float borderRadius, int position) {
+    getOrCreateReactViewBackground().setRadius(borderRadius, position);
+  }
+
   public void setBorderStyle(@Nullable String style) {
     getOrCreateReactViewBackground().setBorderStyle(style);
   }
@@ -353,7 +357,17 @@ public class ReactViewGroup extends ViewGroup implements
   @Override
   protected void onSizeChanged(int w, int h, int oldw, int oldh) {
     super.onSizeChanged(w, h, oldw, oldh);
-    updateClippingRect();
+    if (mRemoveClippedSubviews) {
+      updateClippingRect();
+    }
+  }
+
+  @Override
+  protected void onAttachedToWindow() {
+    super.onAttachedToWindow();
+    if (mRemoveClippedSubviews) {
+      updateClippingRect();
+    }
   }
 
   @Override
