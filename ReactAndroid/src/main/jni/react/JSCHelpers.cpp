@@ -8,7 +8,7 @@
 #include "Value.h"
 
 #if WITH_FBJSCEXTENSIONS
-#include <jsc_function_info_cache.h>
+#include <jsc_preparsing_cache.h>
 #endif
 
 namespace facebook {
@@ -55,7 +55,7 @@ JSValueRef evaluateScript(JSContextRef context, JSStringRef script, JSStringRef 
     auto line = exception.asObject().getProperty("line");
 
     std::ostringstream locationInfo;
-    std::string file = source != nullptr ? String::adopt(source).str() : "";
+    std::string file = source != nullptr ? String::ref(source).str() : "";
     locationInfo << "(" << (file.length() ? file : "<unknown file>");
     if (line != nullptr && line.isNumber()) {
       locationInfo << ":" << line.asInteger();
