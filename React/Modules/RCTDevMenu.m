@@ -239,6 +239,9 @@ RCT_EXPORT_MODULE()
 
   NSString *scheme = [_bridge.bundleURL scheme];
   NSNumber *port = [_bridge.bundleURL port];
+  if (!port) {
+    port = @8081; // Packager default port
+  }
   return [NSURL URLWithString:[NSString stringWithFormat:@"%@://%@:%@/message?role=shell", scheme, host, port]];
 }
 
@@ -541,7 +544,9 @@ RCT_EXPORT_METHOD(show)
 
 RCT_EXPORT_METHOD(reload)
 {
-  [_bridge reload];
+  [[NSNotificationCenter defaultCenter] postNotificationName:RCTReloadNotification
+                                                      object:nil
+                                                    userInfo:nil];
 }
 
 - (void)setShakeToShow:(BOOL)shakeToShow
