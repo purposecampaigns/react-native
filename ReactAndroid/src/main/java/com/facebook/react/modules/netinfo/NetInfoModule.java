@@ -45,8 +45,6 @@ public class NetInfoModule extends ReactContextBaseJavaModule
   private final ConnectivityBroadcastReceiver mConnectivityBroadcastReceiver;
   private boolean mNoNetworkPermission = false;
 
-  private boolean mNoNetworkPermission = false;
-
   private String mConnectivity = "";
 
   public NetInfoModule(ReactApplicationContext reactContext) {
