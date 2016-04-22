@@ -363,6 +363,10 @@ var TextInput = React.createClass({
     return {isInAParentText: true};
   },
 
+  setSelectionRange: function(start: number, end: number): void {
+    this.setNativeProps({selectionRange: {start, end}});
+  }, 
+
   childContextTypes: {
     isInAParentText: React.PropTypes.bool
   },
